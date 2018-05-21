@@ -1,0 +1,332 @@
+#!/usr/bin/python3
+#
+#       prime-select
+#
+#       Copyright 2013 Canonical Ltd.
+#       Author: Alberto Milone <alberto.milone@canonical.com>
+#
+#       Script to switch between NVIDIA and Intel graphics driver libraries.
+#
+#       Usage:
+#           prime-select   nvidia|intel|query
+#           nvidia:   switches to NVIDIA's version of libGL.so
+#           intel: switches to the open-source version of libGL.so
+#           query: checks which version is currently active and writes
+#                  "nvidia", "intel" or "unknown" to the standard output
+#
+#       Permission is hereby granted, free of charge, to any person
+#       obtaining a copy of this software and associated documentation
+#       files (the "Software"), to deal in the Software without
+#       restriction, including without limitation the rights to use,
+#       copy, modify, merge, publish, distribute, sublicense, and/or sell
+#       copies of the Software, and to permit persons to whom the
+#       Software is furnished to do so, subject to the following
+#       conditions:
+#
+#       The above copyright notice and this permission notice shall be
+#       included in all copies or substantial portions of the Software.
+#
+#       THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+#       EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+#       OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+#       NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+#       HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+#       WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+#       FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+#       OTHER DEALINGS IN THE SOFTWARE.
+
+import glob
+import os
+import sys
+import socket
+import re
+import subprocess
+import shutil
+
+from copy import deepcopy
+from subprocess import Popen, PIPE, CalledProcessError
+
+
+class Switcher(object):
+
+    def __init__(self):
+        self._power_profile_path = '/etc/prime-discrete'
+        self._grub_path = '/etc/default/grub'
+        self._grub_cmdline_start = 'GRUB_CMDLINE_LINUX_DEFAULT='
+        self._blacklist_file = '/etc/modprobe.d/blacklist-nvidia.conf'
+        self._gdm_conf_file = '/etc/gdm3/custom.conf'
+        self._xorg_path = "/usr/share/X11/xorg.conf.d/20-intel.conf"
+        self._prime_sock_addr = "/tmp/prime_sock"
+
+    def _get_profile(self):
+
+        try:
+            settings = open(self._power_profile_path, 'r')
+        except:
+            return 'unknown'
+
+        if settings.read().strip() == 'on':
+            return 'nvidia'
+        else:
+            return 'intel'
+
+    def print_profile(self):
+        profile = self._get_profile()
+        if profile == 'unknown':
+            return False
+
+        print('%s' % profile)
+        return True
+
+    def _write_profile(self, profile):
+        if profile == 'intel':
+            nvidia_power = 'off'
+        elif profile == 'nvidia':
+            nvidia_power = 'on'
+        else:
+            return False
+
+        # Write the settings to the file
+        settings = open(self._power_profile_path, 'w')
+        settings.write('%s\n' % nvidia_power)
+        settings.close()
+
+    def _supports_prime(self):
+        #i915 nvidia_drm
+        # modinfo nvidia-drm
+        # /var/lib/ubuntu-drivers-common/requires_offloading
+        return (os.path.isfile('/var/lib/ubuntu-drivers-common/requires_offloading') or
+                os.path.isfile('/run/u-d-c-nvidia-was-loaded'))
+
+    def enable_profile(self, profile):
+        current_profile = self._get_profile()
+
+        if profile == current_profile:
+            # No need to do anything if we're already using the desired
+            # profile
+            sys.stdout.write('Info: the %s profile is already set\n' % (profile))
+            return True
+
+        sys.stdout.write('Info: selecting the %s profile\n' % (profile))
+
+        self._backup_grub_config()
+
+        if profile == 'nvidia':
+            # Always allow enabling nvidia
+            # (No need to check if nvidia is available)
+            self._enable_nvidia()
+        else:
+            # Make sure that the installed packages support PRIME
+            if not self._supports_prime():
+                sys.stderr.write('Error: the installed packages do not support PRIME\n')
+                return False
+            self._disable_nvidia()
+
+        # Write the settings to the config file
+        self._write_profile(profile)
+
+        return True
+
+    def _disable_nvidia(self):
+        boot_params = {}
+        # Get the VGA connectors to disable on card1
+        # in the form of boot parameters
+        vga_params = self._get_boot_params_from_phantom_vga_connectors()
+        for elem in vga_params:
+            elems = elem.split('=')
+            boot_params[elems[0]] = elems[1]
+        boot_params['nouveau.runpm'] = '0'
+        #self._add_boot_params(self._grub_cmdline_start, self._grub_path, boot_params)
+
+        #self._update_grub()
+        self._blacklist_nvidia()
+        self._add_xorg_intel_conf()
+        #self._update_initramfs()
+
+        self._enable_prime_service()
+        self._trigger_prime_sock()
+
+    def _enable_nvidia(self):
+        #self._remove_boot_params(self._grub_cmdline_start,
+                                 #elf._grub_path, ['nouveau.runpm', 'video=VGA'])
+        #self._update_grub()
+
+        try:
+            os.unlink(self._blacklist_file)
+        except:
+            pass
+        self._del_xorg_intel_conf()
+        #self._update_initramfs()
+
+        self._disable_prime_service()
+        self._trigger_prime_sock()
+
+    def _del_xorg_intel_conf(self):
+        os.remove(self._xorg_path);
+
+    def _add_xorg_intel_conf(self):
+        conf_text = '''
+            Section "Device"
+                Identifier "Intel Graphics"
+                Driver "intel"
+                Option "DRI" "3"
+                Option "TearFree" "true"
+                Option "AccelMethod" "sna"
+            EndSection
+        '''
+        conf_fd = open(self._xorg_path, 'w')
+        conf_fd.write(conf_text)
+        conf_fd.close()
+
+    def _trigger_prime_sock(self):
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.connect(self._prime_sock_addr)
+
+    def _blacklist_nvidia(self):
+        blacklist_text = '''# Do not modify
+# This file was generated by nvidia-prime
+blacklist nvidia
+blacklist nvidia-drm
+blacklist nvidia-modeset
+alias nvidia off
+alias nvidia-drm off
+alias nvidia-modeset off'''
+        blacklist_fd = open(self._blacklist_file, 'w')
+        blacklist_fd.write(blacklist_text)
+        blacklist_fd.close()
+
+    def _enable_prime_service(self):
+        subprocess.call(['systemctl', 'enable', 'nvidia-prime-boot.service'])
+        subprocess.call(['systemctl', 'daemon-reload'])
+
+    def _disable_prime_service(self):
+        subprocess.call(['systemctl', 'disable', 'nvidia-prime-boot.service'])
+        subprocess.call(['systemctl', 'daemon-reload'])
+
+    def _add_boot_params(self, pattern, path, params):
+        it = 0
+        arg_found = False
+
+        with open(path, 'r+') as f:
+            t = f.read()
+            f.seek(0)
+            for line in t.split('\n'):
+                if line.startswith(pattern):
+                    boot_args = line.replace(pattern, '').replace('"', '')
+                    boot_args_list = boot_args.split(' ')
+                    final_boot_args = deepcopy(boot_args_list)
+
+                    for key, value in params.items():
+                        target_param = '%s=%s' % (key, value)
+                        for i, arg in enumerate(boot_args_list):
+                            if key in arg:
+                                arg_found = True
+                                final_boot_args[i] = '%s' % (target_param)
+                        if not arg_found:
+                            final_boot_args.append(target_param)
+                        else:
+                            arg_found = False
+                    new_line = '%s"%s"' % (pattern, ' '.join(final_boot_args))
+                    f.write('%s%s' % ((it > 0 and '\n' or ''), new_line))
+                else:
+                    f.write('%s%s' % ((it > 0 and '\n' or ''), line))
+                it +=1
+            f.truncate()
+
+    def _remove_boot_params(self, pattern, path, params):
+        it = 0
+        arg_found = False
+
+        with open(path, 'r+') as f:
+            t = f.read()
+            f.seek(0)
+            for line in t.split('\n'):
+                if line.startswith(pattern):
+                    boot_args = line.replace(pattern, '').replace('"', '')
+                    boot_args_list = boot_args.split(' ')
+                    final_boot_args = deepcopy(boot_args_list)
+
+                    for key in params:
+                        for i, arg in enumerate(boot_args_list):
+                            if key in arg:
+                                final_boot_args[i] = ''
+                    final_boot_args = list(filter(bool, final_boot_args))
+                    new_line = '%s"%s"' % (pattern, ' '.join(final_boot_args))
+                    f.write('%s%s' % ((it > 0 and '\n' or ''), new_line))
+                else:
+                    f.write('%s%s' % ((it > 0 and '\n' or ''), line))
+                it +=1
+            f.truncate()
+
+
+    def _find_connected_connectors(self, card):
+        connectors = glob.glob('/sys/class/drm/%s-*' % (card))
+        connected_connectors = []
+        for connector in connectors:
+            path = '%s/status' % connector
+            with open(path, 'r') as f:
+                t = f.read()
+                if t.strip() == 'connected':
+                    connected_connectors.append(connector)
+                f.close()
+        return connected_connectors
+
+    def _get_boot_params_from_phantom_vga_connectors(self):
+        params = []
+        connectors = self._find_connected_connectors('card1')
+        for connector in connectors:
+            if 'vga' in connector.lower():
+                conn = connector.replace('/sys/class/drm/card1-', '').replace('-', '')
+                param = 'video=%s:d' % conn
+                params.append(param)
+        return params
+
+    def _update_initramfs(self):
+        subprocess.call(['update-initramfs', '-u'])
+        # This may not be necessary
+        subprocess.call(['update-initramfs', '-u', '-k', os.uname()[2]])
+
+    def _update_grub(self):
+        subprocess.call(['update-grub'])
+
+    def _backup_grub_config(self):
+        destination = '%s.prime-backup' % self._grub_path
+        if not os.path.isfile(destination):
+            shutil.copyfile(self._grub_path, destination)
+
+
+def check_root():
+    if not os.geteuid() == 0:
+        sys.stderr.write("This operation requires root privileges\n")
+        exit(1)
+
+def handle_query_error():
+    sys.stderr.write("Error: no profile can be found\n")
+    exit(1)
+
+def usage():
+    sys.stderr.write("Usage: %s nvidia|intel|query\n" % (sys.argv[0]))
+
+if __name__ == '__main__':
+    try:
+        arg = sys.argv[1]
+    except IndexError:
+        arg = None
+
+    if len(sys.argv[1:]) != 1:
+        usage()
+        exit(1)
+
+    switcher = Switcher()
+
+    if arg == 'intel' or arg == 'nvidia':
+        check_root()
+        switcher.enable_profile(arg)
+    elif arg == 'query':
+        if not switcher.print_profile():
+            handle_query_error()
+    else:
+        usage()
+        sys.exit(1)
+
+    exit(0)

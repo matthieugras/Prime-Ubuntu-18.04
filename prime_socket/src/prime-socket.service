@@ -1,0 +1,9 @@
+[Unit]
+Description=Socket service for on the fly prime switching
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/prime_socket
+
+[Install]
+WantedBy=multi-user.target

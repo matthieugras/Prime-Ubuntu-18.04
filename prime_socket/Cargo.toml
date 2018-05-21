@@ -1,0 +1,9 @@
+[package]
+name = "prime_socket"
+version = "0.1.0"
+authors = ["rofl"]
+
+[dependencies]
+tokio-uds = ""
+tokio-core = ""
+futures = ""

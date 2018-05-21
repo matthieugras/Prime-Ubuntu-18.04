@@ -1,0 +1,10 @@
+[Unit]
+Description=dGPU off during boot
+After=nvidia-fallback.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c "modprobe bbswitch; echo OFF > /proc/acpi/bbswitch"
+
+[Install]
+WantedBy=display-manager.service
