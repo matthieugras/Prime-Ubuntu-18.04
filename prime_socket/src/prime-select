@@ -35,9 +35,6 @@
 #       FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 #       OTHER DEALINGS IN THE SOFTWARE.
 
-#       Additional changes made by 
-#       Matthieu Gras <matthieu.gras@outlook.com
-
 import glob
 import os
 import sys
@@ -124,7 +121,7 @@ class Switcher(object):
                 sys.stderr.write('Error: the installed packages do not support PRIME\n')
                 return False
             self._disable_nvidia()
-
+        self._trigger_prime_sock()
         # Write the settings to the config file
         self._write_profile(profile)
 
@@ -147,7 +144,6 @@ class Switcher(object):
         #self._update_initramfs()
 
         self._enable_prime_service()
-        self._trigger_prime_sock()
 
     def _enable_nvidia(self):
         #self._remove_boot_params(self._grub_cmdline_start,
@@ -162,7 +158,6 @@ class Switcher(object):
         #self._update_initramfs()
 
         self._disable_prime_service()
-        self._trigger_prime_sock()
 
     def _del_xorg_intel_conf(self):
         os.remove(self._xorg_path);
@@ -184,6 +179,7 @@ class Switcher(object):
     def _trigger_prime_sock(self):
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.connect(self._prime_sock_addr)
+        sock.recvfrom(1)
 
     def _blacklist_nvidia(self):
         blacklist_text = '''# Do not modify
