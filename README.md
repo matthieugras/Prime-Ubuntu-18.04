@@ -12,4 +12,4 @@ then:\
 cd src\
 make install\
 sudo systemctl enable prime-socket\
-sudo systemctl start prime-socket\
+sudo systemctl start prime-socket
