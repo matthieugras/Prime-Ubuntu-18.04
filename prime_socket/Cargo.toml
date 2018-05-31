@@ -7,3 +7,4 @@ authors = ["rofl"]
 tokio-uds = ""
 tokio-core = ""
 futures = ""
+tokio = ""
