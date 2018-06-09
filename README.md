@@ -18,15 +18,6 @@ lightdm as the display manager
 sudo apt install lightdm
 
 The ubuntu install of the nvidia driver will also install nvidia-prime, Ubuntu's optimus module. The code supersedes that but you should leave the ubuntu package installed. 
-<<<<<<< HEAD
-=======
-
->>>>>>> 20287c1... readme
-
-<<<<<<< HEAD
-
-=======
->>>>>>> 63af1e7... readme
 # How to build & install
 First build the rust part with cargo\
 cd prime_socket\
