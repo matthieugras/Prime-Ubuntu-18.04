@@ -54,13 +54,22 @@ sudo systemctl start prime-socket
 sudo prime-select intel|nvidia|query
 ```
 
-Don't use the graphical switcher of the nvidia-control panel. It uses the standard debian way, which will rebuild your kernel. It goes to the effort of actually removing the nvidia drivers if you go to intel mode, which will stop this fast-switch method from working.
+Don't use the graphical switcher of the nvidia-control panel. It uses the standard debian way, which will rebuild your kernel image: it does this to remove the nvidia drivers with extreme prejudice when you swap to intel mode, which will stop this fast-switch method from working.
 
 If you remove the nvidia modules using Ubuntu's standard (slow) method, you will need to use the standard method to put them back (by using the nvidia control panel to swap back to nvidia).
 If you want to use the standard prime-select script, it is untouched at
 /usr/bin/prime-select
 
 The modified version at /usr/local/bin has priority in the path so if you need to use the standard script, be explicit about the path.
+
+# Did it work?
+
+after entering intel mode, start a sudo shell and test if the card is off:
+```
+sudo -i
+modprobe bbswitch
+cat /proc/acpi/bbswitch
+```
 
 
 # Notes
@@ -77,24 +86,22 @@ and repeat `sudo prime-select nvidia`
 
 * todo: fix this, it's a paper-cut.
 
-
-Reinstalling may need you to 
-```
-sudo rm /usr/local/bin/prime_socket
-```
-and then reattempt
-`make install`
-
 # Uninstall
 
 This code doesn't really disturb your system much. 
-You could rename /usr/local/bin/prime-select to /usr/local/bin/prime-select-fast
+You could rename /usr/local/bin/prime-select to /usr/local/bin/prime-select-fast so that the standard script is no longer masked by the modified one.
 
 
 If you are in intel mode, then nvidia-prime-boot.service is enabled, and it will unload the nvidia drivers. The standard Ubuntu method does not expect this; if shouldn't affect you booting in intel mode, but it can't be good if you are trying to use the standard Ubuntu method to boot into hybrid mode. 
 So disable the service.
 
 `sudo systemctl disable nvidia-prime-boot.service`
+
+And then
+
+`sudo /usr/bin/prime-select nvidia`
+
+You should be back to standard ubuntu now. 
 
 ## Uninstall bbswitch-dkms
 You installed the bbswitch-dkms module to get this working.
@@ -154,25 +161,29 @@ you may also find something useful in
 journalctl -e
 ```
 
-You should not see an error the bbswitch is not installed, because that means you didn't read the instructions above. Also, you should not see errors that no nvidia modules are installed, because that means you either did not install the nvidia drivers, or you removed them (perhaps by 18.04-standard `prime-select intel`, in which case `sudo /usr/bin/prime-select nvidia` and reboot. Pleaes carefully read the installation instructions above ...
+You should not see an error telling you that bbswitch is not installed, because that means you didn't read the instructions above. Also, you should not see errors that no nvidia modules are installed, because that means you either did not install the nvidia drivers, or you removed them (perhaps by 18.04-standard `prime-select intel`, in which case `sudo /usr/bin/prime-select nvidia` and reboot. Please carefully read the installation instructions above ...
 
 ## Intel-mode Fix attempt 2
 >>>>>>> b554cc3... Update README.md
 if you can't get to a graphical session even with recovery boot,
  then try to get to a virtual console and 
 check with `lsmod|grep nvidia`. 
+and to be safe, check `lsmod|grep nouveau`
+You should never see the nouveau driver, this would be a nasty bug, please open an issue.
+
 If the nvidia drivers are present:
 then from the virtual terminal:
 
 ```
 sudo systemctl stop lightdm
+sudo rmmod nouveau #in case it is loaded
 sudo rmmod nvidia_drm
 sudo rmmod nvidia_modeset
 sudo rmmod nvidia_uvm
 sudo rmmod nvidia
 sudo systemctl start lightdm
 ```
-but you will have to work out why the nvidia-prime-boot.service did not do its job.
+but you will have to work out why the nvidia-prime-boot.service did not do its job, which is to remove these modules.
 
 These two methods have solved any problems I have encountered. 
 
@@ -220,11 +231,11 @@ The rust code prepares the state change.
 
 # How is this different to the standard 18.04 approach?
 
-Ubuntu 18.04 does not use bbswitch to power-off the nvidia card when you are in intel-only mode. Instead, the developers swapped to an officially-supported kernel feature, which only works when the nouveau driver is present. 
-Unfortunately, this means the nvidia drivers have to be removed. So prime-select intel goes through an elaborate process of removing the nvidia drivers, rebuilding the initramfs image and rebooting, solely to load nouveau so the nvidia card can be turned off. 
+Two things are different. Firstly, nvidia-prime in Ubuntu 18.04 does not use bbswitch to power-off the nvidia card when you are in intel-only mode. Instead, the developers swapped to an officially-supported kernel feature, which only works when the nouveau driver is present. 
+Unfortunately, this means the nvidia drivers have to be removed. So prime-select intel goes through an elaborate process of removing the nvidia drivers, rebuilding the initramfs image and rebooting, solely to load nouveau so the nvidia card can be turned off. I don't know why they can't just be unloaded following the approach used here, which is the second difference.
 
 Swapping back to nvidia then requires the basically the same process to repeat, except this time the nvidia modules are re-added to the kernel image. 
 
-It is a very time consuming approach, mandating a reboot. Also, quite a few users have trouble getting the nouveau-power-off to work. 
+It is a very time consuming approach, mandating a reboot. Also, quite a few users have trouble getting the nouveau-power-off to work, so for those users it is slow, intrusive and broken.
 
-bbswitch is not officially in the kernel. However, it is well used in just about all other distributions and there is no sign that it will stop working.
+bbswitch is not officially in the kernel. However, it is well used in just about all other distribution; it has a significant user-base, and there is no sign that it will stop working. Right now, it works with kernel 4.17 even as Ubuntu 18.04 is based on 4.15.
