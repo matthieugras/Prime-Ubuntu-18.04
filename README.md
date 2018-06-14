@@ -1,12 +1,24 @@
 # Fast Switch  Prime-Ubuntu-18.04
+
 Nvidia Prime without rebooting. Assumes lightdm is installed.
+
+Why does this exist? It restores the pre-18.04 'bbswitch' approach; it's much faster to change profiles and more reliable. However, it also takes advantage of recent improvements, so you can swap modes without rebooting.
+
+This is not for Ubuntu beginners. If things go wrong, you need to know about virtual consoles and recovery mode and some basic systemd admin.
+
+To install it, you need to know about git clone and you need to be able to change your display manager to lightdm.
+
+Good support comes from this thread:
+https://devtalk.nvidia.com/default/topic/1032482/linux/optimus-on-ubuntu-18-04-is-a-step-backwards-but-i-found-the-first-good-solution/
+
 
 # Dependencies:
 
 You need rust.
 install from apt: `sudo apt install rustc cargo`
 
-also, properly install the nvidia drivers the standard ubuntu way, from Additional Drivers
+* properly install the nvidia drivers the standard ubuntu way, from Additional Drivers.
+
 If you have done this already, make sure you do 
 ```prime-select nvidia ``` 
 to ensure that nvidia drivers are installed in your initramfs.
@@ -22,14 +34,17 @@ If you are reading this after installing the fast prime-select (this module), th
 * lightdm as the display manager
 sudo apt install lightdm
 ```
-
+You can swap between display managers with `sudo dpkg-reconfigure lightdm`
 The ubuntu install of the nvidia driver will also install nvidia-prime, Ubuntu's optimus module. The code supersedes that but you should leave the ubuntu package installed. 
 
+Note: while testing this in a reinstall of Ubuntu 18.04, lightdm did not install properly on one laptop. Work-around: install xubuntu-desktop which relies on lightdm, but still kept ubuntu as the log-in session.
+
+
 # How to build & install
-Naturally, make sure you have git and git clone this repository :) 
+Naturally, make sure you have git and git clone this repository  
 
 ```
-cd src
+cd prime_socket/src
 sudo make install
 ```
 
@@ -82,6 +97,13 @@ And then
 
 `sudo /usr/bin/prime-select nvidia`
 
+and to revert to gdm3, install and select it as the default:
+```
+sudo apt install gdm3
+sudo dpkg-reconfigure gdm3
+```
+
+
 You should be back to standard ubuntu now. 
 
 ## Uninstall bbswitch-dkms
@@ -109,7 +131,26 @@ Tearing you see on non-laptop panels won't be fixed by prime sync. For that prob
 
 # Troubleshooting: Display manager doesn't start?
 
-First, make sure you did the systemctl lines of the the install instructions.
+This is not for Ubuntu beginners. You need to know about virtual consoles and recovery mode and some basic systemd admin.
+
+First, you need access to a virtual console. 
+Depending on what has gone wrong, you may be able to access a virtual console.
+`sudo apt install openssh-server` is always helpful too.
+
+Starting in recovery mode usually works to get a GUI login. (choose resume boot twice during the boot process). 
+make sure the systemctl lines in the makefile worked by using systemctl status prime-socket.
+This is what it should look like: the service should be active and running.
+```
+● prime-socket.service - Socket service for on the fly prime switching
+   Loaded: loaded (/etc/systemd/system/prime-socket.service; enabled; vendor pre
+   Active: active (running) since Fri 2018-06-15 08:41:00 AEST; 31min ago
+ Main PID: 808 (prime_socket)
+    Tasks: 2 (limit: 4915)
+   CGroup: /system.slice/prime-socket.service
+           └─808 /usr/local/bin/prime_socket
+
+Jun 15 08:41:00 raffles systemd[1]: Started Socket service for on the fly prime
+```
 
 
 ## Display manager doesn't start in intel mode
@@ -145,7 +186,6 @@ journalctl -e
 You should not see an error telling you that bbswitch is not installed, because that means you didn't read the instructions above. Also, you should not see errors that no nvidia modules are installed, because that means you either did not install the nvidia drivers, or you removed them (perhaps by 18.04-standard `prime-select intel`, in which case `sudo /usr/bin/prime-select nvidia` and reboot. Please carefully read the installation instructions above ...
 
 ## Intel-mode Fix attempt 2
->>>>>>> b554cc3... Update README.md
 if you can't get to a graphical session even with recovery boot,
  then try to get to a virtual console and 
 check with `lsmod|grep nvidia`. 
