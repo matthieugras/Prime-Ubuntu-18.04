@@ -51,7 +51,8 @@ fn main() {
                 .and_then(move |_| {
                     let kill_x = Command::new("sh")
                         .arg("-c")
-                        .arg("systemctl disable lightdm && systemctl stop lightdm")
+                        //.arg("systemctl disable lightdm && systemctl stop lightdm")
+                        .arg(" systemctl stop lightdm")
                         .status()?;
 
                     if !kill_x.success() {
@@ -86,7 +87,8 @@ fn main() {
                     sleep(Duration::from_millis(500));
                     let restart_x = Command::new("sh")
                         .arg("-c")
-                        .arg("dpkg-reconfigure lightdm && systemctl start lightdm")
+                        //.arg("dpkg-reconfigure lightdm && systemctl start lightdm")
+                        .arg("systemctl start lightdm")
                         .status()?;
 
                     if !restart_x.success() {
