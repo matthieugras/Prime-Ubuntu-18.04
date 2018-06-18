@@ -1,10 +1,10 @@
 [Unit]
-Description=dGPU off during boot
+Description=Unload nvidia modules and turn dGPU off during boot
 After=nvidia-fallback.service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c "rmmod nvidia_drm;rmmod nvidia_modeset; rmmod nvidia_uvm; rmmod nvidia; modprobe bbswitch; echo OFF > /proc/acpi/bbswitch"
+ExecStart=/usr/local/bin/turnoff_nvidia_at_boot
 
 [Install]
 WantedBy=multi-user.target
