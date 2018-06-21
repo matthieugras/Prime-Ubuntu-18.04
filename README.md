@@ -32,8 +32,11 @@ If you are reading this after installing the fast prime-select (this module), th
 * bbswitch (via `sudo apt install bbswitch-dkms`)
 
 * lightdm as the display manager
+
+```
 sudo apt install lightdm
 ```
+
 You can swap between display managers with `sudo dpkg-reconfigure lightdm`
 The ubuntu install of the nvidia driver will also install nvidia-prime, Ubuntu's optimus module. The code supersedes that but you should leave the ubuntu package installed. 
 
