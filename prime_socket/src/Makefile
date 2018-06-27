@@ -1,4 +1,14 @@
+install: mode=$(shell /usr/bin/prime-select query)
 install:
+	@echo "Current Mode is '$(mode)'"
+	@if [ $(mode) =  "nvidia" ]; then \
+		make nvidia; \
+	else	\
+		echo "Make sure you set the display to 'nvidia' mode, by running 'sudo /usr/bin/prime-select nvidia' first";	\
+	fi
+
+nvidia:
+	echo "Making now"
 	#sudo cp 10-monitor.conf /usr/share/X11/xorg.conf.d/
 	cd .. && sudo cargo build
 	sudo cp nvidia-prime-boot.service /etc/systemd/system/
