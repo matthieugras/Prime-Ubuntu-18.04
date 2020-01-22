@@ -1,4 +1,4 @@
-# Fast Switch  Prime-Ubuntu-18.04
+# Fast Switch Prime-Ubuntu-18.04
 
 Nvidia Prime without rebooting. Assumes lightdm is installed.
 
@@ -8,67 +8,64 @@ This is not for Ubuntu beginners. If things go wrong, you need to know about vir
 
 To install it, you need to know about git clone and you need to be able to change your display manager to lightdm.
 
-Good support comes from this thread:
-https://devtalk.nvidia.com/default/topic/1032482/linux/optimus-on-ubuntu-18-04-is-a-step-backwards-but-i-found-the-first-good-solution/
+Good support comes from this [thread](https://devtalk.nvidia.com/default/topic/1032482/linux/optimus-on-ubuntu-18-04-is-a-step-backwards-but-i-found-the-first-good-solution/).
 
 
 # Dependencies:
 
-You need rust.
-install from apt: `sudo apt install rustc cargo`
+You need [Rust](https://www.rust-lang.org/), to install from apt: `sudo apt install rustc cargo`.
 
-* properly install the nvidia drivers the standard ubuntu way, from Additional Drivers.
+Properly install the nvidia drivers the standard ubuntu way, from Additional Drivers.
 
 If you have done this already, make sure you do 
 ```prime-select nvidia ``` 
 to ensure that nvidia drivers are installed in your initramfs.
 
-If you are reading this after installing the fast prime-select (this module), then you access the standard prime-select via /usr/bin/prime-select
+If you are reading this after installing the fast prime-select (this module), then you access the standard prime-select via `/usr/bin/prime-select`.
 * This code assumes the nvidia drivers are installed. They are installed by the standard Ubuntu module, but if you did the standard 18.04 `prime-select intel`, they are no longer installed in the kernel. So do `prime-select nvidia` and reboot. Make sure you have the nvidia drivers running before proceeding.
 
 
-* Ubuntu 18.04 (might work with other distros of similar age which are based on the vendor-neutral library approach, if you change some paths)
+* Ubuntu 18.04 (might works with other distros of similar age which are based on the vendor-neutral library approach, if you change some paths).
 
-* bbswitch (via `sudo apt install bbswitch-dkms`)
+* [bbswitch](https://packages.ubuntu.com/bionic/bbswitch-dkms) (via `sudo apt install bbswitch-dkms`).
 
-* lightdm as the display manager
+* [lightdm](https://wiki.ubuntu.com/LightDM) as the display manager.
 
-```
+```bash
 sudo apt install lightdm
 ```
 
-You can swap between display managers with `sudo dpkg-reconfigure lightdm`
-The ubuntu install of the nvidia driver will also install nvidia-prime, Ubuntu's optimus module. The code supersedes that but you should leave the ubuntu package installed. 
+You can swap between display managers with `sudo dpkg-reconfigure lightdm`.
+The Ubuntu install of the nvidia driver will also install nvidia-prime, Ubuntu's optimus module. The code supersedes that but you should leave the ubuntu package installed. 
 
 Note: while testing this in a reinstall of Ubuntu 18.04, lightdm did not install properly on one laptop. Work-around: install xubuntu-desktop which relies on lightdm, but still kept ubuntu as the log-in session.
 
 
 # How to build & install
-Naturally, make sure you have git and git clone this repository  
+Naturally, make sure you have `git` and `git clone` this repository.
 
-```
+```bash
 cd prime_socket/src
 sudo make install
 ```
 
 # Usage
 
-```
+```bash
 sudo prime-select intel|nvidia|query
 ```
 
 Don't use the graphical switcher of the nvidia-control panel. It uses the standard debian way, which will rebuild your kernel image: it does this to remove the nvidia drivers with extreme prejudice when you swap to intel mode, which will stop this fast-switch method from working.
 
 If you remove the nvidia modules using Ubuntu's standard (slow) method, you will need to use the standard method to put them back (by using the nvidia control panel to swap back to nvidia).
-If you want to use the standard prime-select script, it is untouched at
-/usr/bin/prime-select
+If you want to use the standard prime-select script, it is untouched at `/usr/bin/prime-select`.
 
-The modified version at /usr/local/bin has priority in the path so if you need to use the standard script, be explicit about the path.
+The modified version at `/usr/local/bin` has priority in the path so if you need to use the standard script, be explicit about the path.
 
 # Did it work?
 
-after entering intel mode, start a sudo shell and test if the card is off:
-```
+After entering Intel mode, start a `sudo` shell and test if the card is off:
+```bash
 sudo -i
 modprobe bbswitch
 cat /proc/acpi/bbswitch
@@ -81,11 +78,8 @@ You must have the nvidia drivers installed in your initramfs.
 This will be true if you have installed the standard Ubuntu nvidia-drivers but it will not be true if you did the standard ```prime-select intel```.
 See notes above. 
 
-The first time you use sudo prime-select nvidia to change, you may get an error about a missing file
-/usr/share/X11/xorg.conf.d/20-intel.conf
-which the script tries to delete. 
-Do: `sudo touch /usr/share/X11/xorg.conf.d/20-intel.conf`
-and repeat `sudo prime-select nvidia`
+The first time you use sudo prime-select nvidia to change, you may get an error about a missing file `/usr/share/X11/xorg.conf.d/20-intel.conf` which the script tries to delete. 
+Do: `sudo touch /usr/share/X11/xorg.conf.d/20-intel.conf` and repeat `sudo prime-select nvidia`.
 
 
 ## Prime sync for tear free laptop panel
@@ -94,22 +88,22 @@ and repeat `sudo prime-select nvidia`
 # Uninstall
 
 This code doesn't really disturb your system much. 
-You could rename /usr/local/bin/prime-select to /usr/local/bin/prime-select-fast so that the standard script is no longer masked by the modified one.
+You could rename `/usr/local/bin/prime-select` to `/usr/local/bin/prime-select-fast` so that the standard script is no longer masked by the modified one.
 
-purge and reinstall the package nvidia-prime
-`sudo apt purge nvidia-prime; sudo apt install nvidia-prime`
-And then
-
-`sudo /usr/bin/prime-select nvidia`
-
-and to revert to gdm3, install and select it as the default:
+Purge and reinstall the package nvidia-prime:
+```bash
+sudo apt purge nvidia-prime; sudo apt install nvidia-prime
+sudo /usr/bin/prime-select nvidia
 ```
+
+Revert to gdm3, install and select it as the default:
+```bash
 sudo apt install gdm3
 sudo dpkg-reconfigure gdm3
 ```
 
 
-You should be back to standard ubuntu now. 
+You should be back to standard Ubuntu now. 
 
 ## Uninstall bbswitch-dkms
 You installed the bbswitch-dkms module to get this working.
@@ -123,7 +117,7 @@ This tip applies to standard Ubuntu too.
 In nvidia mode, you'll get tearing on the laptop unless you enable prime sync.\
 `sudo vi /etc/modprobe.d/zz-nvidia-modeset.conf`
 and include this:
-```
+```bash
 #enable prime-sync
 options nvidia-drm modeset=1
 ```
@@ -145,7 +139,7 @@ Depending on what has gone wrong, you may be able to access a virtual console.
 Starting in recovery mode usually works to get a GUI login. (choose resume boot twice during the boot process). 
 make sure the systemctl lines in the makefile worked by using systemctl status prime-socket.
 This is what it should look like: the service should be active and running.
-```
+```bash
 ● prime-socket.service - Socket service for on the fly prime switching
    Loaded: loaded (/etc/systemd/system/prime-socket.service; enabled; vendor pre
    Active: active (running) since Fri 2018-06-15 08:41:00 AEST; 31min ago
@@ -157,7 +151,6 @@ This is what it should look like: the service should be active and running.
 Jun 15 08:41:00 raffles systemd[1]: Started Socket service for on the fly prime
 ```
 
-
 ## Display manager doesn't start in intel mode
 If you swap to intel, reboot and can't get the display manager working, this is probably because the nvidia drivers were not unloaded. 
 
@@ -167,13 +160,13 @@ boot in recovery mode, and choose "resume boot" (possibly twice)
 This will probably get lightdm started, allowing you to log in.
 
 Check if the service which unloads the nvidia drivers is working:
-```
+```bash
 sudo -i
 systemctl status nvidia-prime-boot.service
 ```
 
 Here is an example of healthy output:
-```
+```bash
 root@raffles:~# systemctl status nvidia-prime-boot.service
 ● nvidia-prime-boot.service - dGPU off during boot
    Loaded: loaded (/etc/systemd/system/nvidia-prime-boot.service; disabled; vendor preset: enabled)
@@ -183,8 +176,8 @@ Jun 10 10:24:09 raffles systemd[1]: Starting dGPU off during boot...
 Jun 10 10:24:09 raffles systemd[1]: Started dGPU off during boot.
 ```
 
-you may also find something useful in 
-```
+You may also find something useful in 
+```bash
 journalctl -e
 ```
 
@@ -200,7 +193,7 @@ You should never see the nouveau driver, this would be a nasty bug, please open 
 If the nvidia drivers are present:
 then from the virtual terminal:
 
-```
+```bash
 sudo systemctl stop lightdm
 sudo rmmod nouveau #in case it is loaded
 sudo rmmod nvidia_drm
